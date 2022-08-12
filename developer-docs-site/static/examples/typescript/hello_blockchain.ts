@@ -96,8 +96,11 @@ async function main() {
   assert(process.argv.length == 3, "Expecting an argument that points to the helloblockchain module");
 
   // Create two accounts, Alice and Bob, and fund Alice but not Bob
-  const alice = new AptosAccount();
-  const bob = new AptosAccount();
+  // let alicePrivateKey, bobPrivateKey = null;
+  let alicePrivateKey = Buffer.from('2ef54d3dc120df392f597e493f0a2b112562298f3f24401cac27ef291b5b97e94e0ddc2eab2ae48d6f97e72fb67acd13fba589d84e07b4fed77e70886a876b40', 'hex');
+  let bobPrivateKey = Buffer.from('d5c73252f3c546a8e5df5143598d7d84c5282c426b533495d07b1f1cbe7f168b0054c569aa64ee09e3344f340a707deb17cf2d0eb1d214fa4260e4a3ba443555', 'hex');
+  const alice = new AptosAccount(alicePrivateKey);
+  const bob = new AptosAccount(bobPrivateKey);
 
   console.log("\n=== Addresses ===");
   console.log(`Alice: ${alice.address()}`);
@@ -107,8 +110,8 @@ async function main() {
   await faucetClient.fundAccount(bob.address(), 5_000);
 
   console.log("\n=== Initial Balances ===");
-  console.log(`Alice: ${await accountBalance(alice.address())}`);
-  console.log(`Bob: ${await accountBalance(bob.address())}`);
+  console.log(`Alice: ${alice.address()} Key Seed: ${Buffer.from(alice.signingKey.secretKey).toString("hex")}`);
+  console.log(`Bob: ${bob.address()} Key Seed: ${Buffer.from(bob.signingKey.secretKey).toString("hex")}`);
 
   await new Promise<void>((resolve) => {
     readline.question(
