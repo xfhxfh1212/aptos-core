@@ -53,7 +53,7 @@ use std::{
 
 impl WriteOp {
     pub fn value_strategy() -> impl Strategy<Value = Self> {
-        vec(any::<u8>(), 0..64).prop_map(WriteOp::Value)
+        vec(any::<u8>(), 0..64).prop_map(WriteOp::Modification)
     }
 
     pub fn deletion_strategy() -> impl Strategy<Value = Self> {
@@ -718,7 +718,12 @@ pub struct CoinStoreResourceGen {
 
 impl CoinStoreResourceGen {
     pub fn materialize(self) -> CoinStoreResource {
-        CoinStoreResource::new(self.coin, EventHandle::random(0), EventHandle::random(0))
+        CoinStoreResource::new(
+            self.coin,
+            false,
+            EventHandle::random(0),
+            EventHandle::random(0),
+        )
     }
 }
 
@@ -842,8 +847,8 @@ impl TransactionToCommitGen {
                     .map(move |(key, value)| {
                         let state_key = StateKey::AccessPath(AccessPath::new(address, key));
                         (
-                            (state_key.clone(), StateValue::from(value.clone())),
-                            (state_key, WriteOp::Value(value)),
+                            (state_key.clone(), Some(StateValue::from(value.clone()))),
+                            (state_key, WriteOp::Modification(value)),
                         )
                     })
             })
@@ -971,7 +976,7 @@ impl Arbitrary for BlockMetadata {
             any::<u64>(),
             any::<AccountAddress>(),
             any::<u32>(),
-            prop::collection::vec(any::<bool>(), num_validators_range.clone()),
+            prop::collection::vec(any::<u8>(), num_validators_range.clone()),
             prop::collection::vec(any::<u32>(), num_validators_range),
             any::<u64>(),
         )

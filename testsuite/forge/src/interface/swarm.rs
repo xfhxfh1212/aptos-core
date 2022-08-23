@@ -1,7 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{ChainInfo, FullNode, NodeExt, Result, SwarmChaos, Validator, Version};
+use crate::{
+    AptosPublicInfo, ChainInfo, FullNode, NodeExt, Result, SwarmChaos, Validator, Version,
+};
 use anyhow::{anyhow, bail};
 use aptos_config::config::NodeConfig;
 use aptos_logger::info;
@@ -9,7 +11,10 @@ use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::PeerId;
 use futures::future::try_join_all;
 use prometheus_http_query::response::PromqlResult;
-use std::time::{Duration, Instant};
+use std::{
+    collections::HashMap,
+    time::{Duration, Instant},
+};
 use tokio::runtime::Runtime;
 
 /// Trait used to represent a running network comprised of Validators and FullNodes
@@ -32,7 +37,7 @@ pub trait Swarm: Sync {
     fn validator_mut(&mut self, id: PeerId) -> Option<&mut dyn Validator>;
 
     /// Upgrade a Validator to run specified `Version`
-    fn upgrade_validator(&mut self, id: PeerId, version: &Version) -> Result<()>;
+    async fn upgrade_validator(&mut self, id: PeerId, version: &Version) -> Result<()>;
 
     /// Returns an Iterator of references to all the FullNodes in the Swarm
     fn full_nodes<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn FullNode> + 'a>;
@@ -87,6 +92,10 @@ pub trait Swarm: Sync {
         time: Option<i64>,
         timeout: Option<i64>,
     ) -> Result<PromqlResult>;
+
+    fn aptos_public_info(&mut self) -> AptosPublicInfo<'_> {
+        self.chain_info().into_aptos_public_info()
+    }
 }
 
 impl<T: ?Sized> SwarmExt for T where T: Swarm {}
@@ -225,20 +234,28 @@ pub trait SwarmExt: Swarm {
     ) -> Result<()> {
         let clients = self
             .validators()
-            .map(|node| node.rest_client())
-            .chain(self.full_nodes().map(|node| node.rest_client()))
-            .collect::<Vec<_>>();
+            .map(|node| (node.name().to_string(), node.rest_client()))
+            .chain(
+                self.full_nodes()
+                    .map(|node| (node.name().to_string(), node.rest_client())),
+            )
+            .collect::<HashMap<_, _>>();
 
         loop {
-            let results =
-                try_join_all(clients.iter().map(|node| node.get_ledger_information())).await;
-            let all_catchup = results
-                .map(|resps| {
-                    resps
-                        .into_iter()
-                        .map(|r| r.into_inner().version)
-                        .all(|v| v >= version)
-                })
+            let results: Result<Vec<_>> =
+                try_join_all(clients.iter().map(|(name, node)| async move {
+                    Ok((
+                        name,
+                        node.get_ledger_information().await?.into_inner().version,
+                    ))
+                }))
+                .await;
+            let versions = results
+                .map(|resps| resps.into_iter().collect::<Vec<_>>())
+                .ok();
+            let all_catchup = versions
+                .clone()
+                .map(|resps| resps.iter().all(|(_, v)| *v >= version))
                 .unwrap_or(false);
             if all_catchup {
                 break;
@@ -246,8 +263,9 @@ pub trait SwarmExt: Swarm {
 
             if Instant::now() > deadline {
                 return Err(anyhow!(
-                    "waiting for nodes to catch up to version {} timed out",
-                    version
+                    "waiting for nodes to catch up to version {} timed out, current status: {:?}",
+                    version,
+                    versions.unwrap_or_default()
                 ));
             }
 
