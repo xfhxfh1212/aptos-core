@@ -58,8 +58,8 @@ export async function accountBalance(accountAddress: MaybeHexString): Promise<nu
 async function transfer(accountFrom: AptosAccount, recipient: MaybeHexString, amount: number): Promise<string> {
   const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 
-  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-    TxnBuilderTypes.ScriptFunction.natural(
+  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+    TxnBuilderTypes.EntryFunction.natural(
       "0x1::coin",
       "transfer",
       [token],
@@ -98,9 +98,9 @@ const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
 /** run our demo! */
 async function main() {
   // Create two accounts, Alice and Bob, and fund Alice but not Bob
-  let alicePrivateKey, bobPrivateKey = null;
-  // let alicePrivateKey = Buffer.from('2ef54d3dc120df392f597e493f0a2b112562298f3f24401cac27ef291b5b97e94e0ddc2eab2ae48d6f97e72fb67acd13fba589d84e07b4fed77e70886a876b40', 'hex');
-  // let bobPrivateKey = Buffer.from('d5c73252f3c546a8e5df5143598d7d84c5282c426b533495d07b1f1cbe7f168b0054c569aa64ee09e3344f340a707deb17cf2d0eb1d214fa4260e4a3ba443555', 'hex');
+  // let alicePrivateKey, bobPrivateKey = null;
+  let alicePrivateKey = Buffer.from('2ef54d3dc120df392f597e493f0a2b112562298f3f24401cac27ef291b5b97e94e0ddc2eab2ae48d6f97e72fb67acd13fba589d84e07b4fed77e70886a876b40', 'hex');
+  let bobPrivateKey = Buffer.from('d5c73252f3c546a8e5df5143598d7d84c5282c426b533495d07b1f1cbe7f168b0054c569aa64ee09e3344f340a707deb17cf2d0eb1d214fa4260e4a3ba443555', 'hex');
   const alice = new AptosAccount(alicePrivateKey);
   const bob = new AptosAccount(bobPrivateKey);
 
